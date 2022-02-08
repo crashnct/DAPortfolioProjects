@@ -1,0 +1,92 @@
+--Portfolio Project 1, from Alex the Analyst on youtube.
+--LINK - https://www.youtube.com/watch?v=qfyynHBFOsM&list=WL&index=99&t=402s
+--Done in Big Query, he does his in Microsoft SQL Server
+
+--Used basic SQL skills, created a CTE to help with analysis and organization, JOINS, WHERE, Aggregate Functions
+
+--Checking that data imported correction
+
+SELECT *
+FROM `atomic-segment-334500.coviddeaths.covvaccinations` LIMIT 1000;
+
+SELECT *
+FROM atomic-segment-334500.coviddeaths.covdeaths LIMIT 1000;
+
+--Looking at percentage of deaths to cases under the covid deaths table
+SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases*100) as CaseDeathPercentage
+FROM atomic-segment-334500.coviddeaths.covdeaths
+ORDER BY location, date;
+
+--Looking at percentage of deaths to cases under the covid deaths table for united states
+--Shows likelyhood of death in the US when contracting covid
+SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases*100) as CaseDeathPercentage
+FROM atomic-segment-334500.coviddeaths.covdeaths
+WHERE location LIKE '%States%'
+ORDER BY location, date;
+
+--Looking at total cases vs population for the united states
+--Showing by DESC to show most recent numbers at top and seeing change as we go back in time.
+--Shows what percentage of population got covid
+SELECT location, date, total_cases, total_deaths, population, (total_cases/population*100) as CasePopPercentage
+FROM atomic-segment-334500.coviddeaths.covdeaths
+WHERE location LIKE '%States%' and continent IS NOT NULL
+ORDER BY location, date DESC;
+
+--Looking at countries with highest infection rate compared to population
+SELECT location, population,  MAX(total_cases), MAX((total_cases/population)*100) AS CasePopPer
+FROM atomic-segment-334500.coviddeaths.covdeaths
+WHERE continent IS NOT NULL
+GROUP BY location, population
+ORDER BY CasePopPer DESC;
+
+
+--Showing countries with highest death count per population
+SELECT location, population,  MAX(total_deaths) as MaxDeaths, MAX((total_deaths/population)*100) AS DeathPopPer
+FROM atomic-segment-334500.coviddeaths.covdeaths
+WHERE continent IS NOT NULL
+GROUP BY location, population
+ORDER BY DeathPopPer DESC;
+
+--Showing continents with highest death count per population
+--Removing the income category, it appears because content column is also null
+SELECT location, population,  MAX(total_deaths) as MaxDeaths, MAX((total_deaths/population)*100) AS DeathPopPer
+FROM atomic-segment-334500.coviddeaths.covdeaths
+WHERE location NOT LIKE '%income%' AND continent IS NULL
+GROUP BY location, population
+ORDER BY MaxDeaths DESC;
+
+--Global Numbers
+SELECT location, population,  MAX(total_deaths) as MaxDeaths, MAX((total_deaths/population)*100) AS DeathPopPer, MAX(total_cases) AS MaxCases, MAX((total_cases/population)*100) AS CasePopPer
+FROM atomic-segment-334500.coviddeaths.covdeaths
+WHERE location LIKE '%World%'
+GROUP BY location, population;
+
+--Joining both covdeaths table and covvaccinations table to look at data side by side
+SELECT *
+FROM atomic-segment-334500.coviddeaths.covdeaths dea
+JOIN atomic-segment-334500.coviddeaths.covvaccinations vac
+ON dea.location = vac.location AND dea.date = vac.date
+ORDER BY dea.location;
+
+--Looking at total population vs vaccinations
+SELECT DISTINCT(dea.location), MAX(dea.date) as latestDate, MAX(dea.population) AS totalPop, MAX(vac.total_vaccinations) as latesttotalvac, (MAX(vac.total_vaccinations)/MAX(dea.population) * 100) as vacpopper
+FROM atomic-segment-334500.coviddeaths.covdeaths dea
+JOIN atomic-segment-334500.coviddeaths.covvaccinations vac
+ON dea.location = vac.location AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+GROUP BY dea.location, dea.population
+ORDER BY vacpopper DESC;
+
+--USE CTE to Avoid Naming Issues to look at US Running Total and percentage of population vaxed
+WITH  PopvsVac
+AS
+(
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(vac.new_vaccinations) OVER (Partition by dea.Location Order by dea.location, dea.Date) as RunningTotalVac
+FROM atomic-segment-334500.coviddeaths.covdeaths dea
+JOIN atomic-segment-334500.coviddeaths.covvaccinations vac
+ON dea.location = vac.location AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+)
+SELECT  *, (RunningTotalVac/Population)*100 as PerPopVac
+FROM  PopvsVac
