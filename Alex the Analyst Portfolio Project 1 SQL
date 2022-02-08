@@ -90,3 +90,17 @@ WHERE dea.continent IS NOT NULL
 )
 SELECT  *, (RunningTotalVac/Population)*100 as PerPopVac
 FROM  PopvsVac
+
+--BIG QUERY requires views to be saved seperately, but this is the code I am choosing to use for future views.
+WITH  PopvsVac
+AS
+(
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(vac.new_vaccinations) OVER (Partition by dea.Location Order by dea.location, dea.Date) as RunningTotalVac
+FROM atomic-segment-334500.coviddeaths.covdeaths dea
+JOIN atomic-segment-334500.coviddeaths.covvaccinations vac
+ON dea.location = vac.location AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+)
+SELECT  *, (RunningTotalVac/Population)*100 as PerPopVac
+FROM  PopvsVac
